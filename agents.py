@@ -292,7 +292,7 @@ class KalmanSFestimation(object):
 
         self.m_labels = ['M{}-{}'.format(i, j) for i, j in product(list(range(self.n)), list(range(self.n)))]
 
-    def run_one_experiment(self, kalman=True):
+    def run_one_experiment(self):
         self.env.make_exp_seq()  # Randomise sequence for every experiment
         X = self.env.stim_seq
         n_time_steps, n_features = X.shape
@@ -302,18 +302,8 @@ class KalmanSFestimation(object):
 
         opto = self.env.opto_seq
 
-        havent_plotted_yet = True
-
         results = {}
         for t in range(n_time_steps):
-            if self.env.get_stage(t) == 4 and havent_plotted_yet:
-                plt.imshow(self.W); plt.colorbar()
-                plt.show()
-                plt.bar(np.arange(len(self.R)), self.R)
-                plt.show()
-                havent_plotted_yet = False
-
-
             # compute temporal difference features
             if np.all(X[t] == np.zeros(X[t].shape)):
                 H = np.zeros(X[t].shape)
@@ -336,12 +326,8 @@ class KalmanSFestimation(object):
 
             delta_t = (opto[t] * X[t]) + (X[t] - self.W.T @ H)  # optogenetics modulated SPE
             rpe = r[t] - np.dot(self.R, X[t])
-            #rpe = r[t] + X[t+1] @ self.W @ self.R - X[t] @ self.W @ self.R  # reward prediction error
 
-            if not kalman:
-                self.W += .2 * np.outer(X[t], delta_t)
-            else:
-                self.W += np.outer(kalman_gain, delta_t)
+            self.W += np.outer(kalman_gain, delta_t)
 
             self.covariance += self.Q - np.outer(kalman_gain, kalman_gain) / lambda_t
             self.R += self.alpha_rw * rpe * X[t]
@@ -360,10 +346,11 @@ class KalmanSFestimation(object):
     def print_m(self):
         return np.around(self.W.reshape(self.n, self.n), decimals=3)
 
-    def show_sr_mat(self):
+    def show_sr_mat(self, title=None):
         plt.imshow(self.W); plt.colorbar()
         plt.xticks(range(7), self.env.feature_names.values())
         plt.yticks(range(7), self.env.feature_names.values())
+        plt.title(title)
         plt.show()
 
 
@@ -408,16 +395,10 @@ class LinearSF(object):
         r = self.env.reward_seq
 
         opto = self.env.opto_seq
-        havent_plotted_yet = True
 
         results = {}
         for t in range(n_time_steps):
-            if self.env.get_stage(t) == 3 and havent_plotted_yet:
-                plt.imshow(self.W); plt.colorbar()
-                plt.show()
-                plt.bar(np.arange(len(self.R)), self.R)
-                plt.show()
-                havent_plotted_yet = False
+
             delta_t = (opto[t] * X[t]) + (X[t] + self.gamma * self.W.T @ X[t+1] - self.W.T @ X[t])  # optogenetics modulated SPE
             rpe = r[t] + X[t+1] @ self.W @ self.R - X[t] @ self.W @ self.R  # reward prediction error
 
@@ -438,8 +419,9 @@ class LinearSF(object):
     def print_m(self):
         return np.around(self.W.reshape(self.n, self.n), decimals=3)
 
-    def show_sr(self):
+    def show_sr_mat(self, title=None):
         plt.imshow(self.W); plt.colorbar()
         plt.xticks(range(7), self.env.feature_names.values())
         plt.yticks(range(7), self.env.feature_names.values())
+        plt.title(title)
         plt.show()
